@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TTS 语音合成演示</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+    background: #f0f2f5;
+    color: #1a202c;
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #667eea, #764ba2, #f093fb);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  .header p { color: #718096; font-size: 0.95rem; }
+
+  .container { max-width: 860px; margin: 0 auto; }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: #e2e8f0;
+    border-radius: 12px;
+    padding: 6px;
+    margin-bottom: 24px;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #718096;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+  }
+  .tab-btn:hover { color: #1a202c; background: #fff; }
+  .tab-btn.active {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+  }
+
+  /* Panel */
+  .panel {
+    display: none;
+    background: #fff;
+    border-radius: 16px;
+    padding: 28px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .panel.active { display: block; }
+
+  .panel-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #1a202c;
+  }
+  .panel-desc { font-size: 0.85rem; color: #718096; margin-bottom: 24px; }
+
+  /* Form */
+  .form-group { margin-bottom: 18px; }
+  label {
+    display: block;
+    font-size: 0.85rem;
+    color: #4a5568;
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+  textarea, input[type="text"], select {
+    width: 100%;
+    padding: 10px 14px;
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    color: #1a202c;
+    font-size: 0.95rem;
+    resize: vertical;
+    transition: border-color 0.2s;
+    font-family: inherit;
+  }
+  textarea:focus, input[type="text"]:focus, select:focus {
+    outline: none;
+    border-color: #667eea;
+  }
+  textarea { min-height: 90px; }
+  select option { background: #fff; }
+
+  /* Speaker grid */
+  .speaker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 6px;
+  }
+  .speaker-card {
+    padding: 6px 8px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    background: #f7fafc;
+  }
+  .speaker-card:hover { border-color: #667eea; background: #fff; }
+  .speaker-card.selected {
+    border-color: #667eea;
+    background: rgba(102,126,234,0.08);
+  }
+  .speaker-card .name { font-weight: 600; font-size: 0.82rem; color: #1a202c; }
+  .speaker-card .lang { font-size: 0.7rem; color: #718096; margin-top: 1px; }
+  .speaker-card .desc { font-size: 0.7rem; color: #4a5568; margin-top: 2px; }
+
+  /* File upload */
+  .file-upload {
+    border: 2px dashed #cbd5e0;
+    border-radius: 10px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    background: #f7fafc;
+  }
+  .file-upload:hover { border-color: #667eea; background: #fff; }
+  .file-upload input { display: none; }
+  .file-upload .icon { font-size: 2rem; margin-bottom: 8px; }
+  .file-upload .hint { font-size: 0.85rem; color: #718096; }
+  .file-upload .filename { color: #667eea; font-size: 0.9rem; margin-top: 6px; }
+
+  /* Row */
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 540px) { .form-row { grid-template-columns: 1fr; } }
+
+  /* Generate button */
+  .btn-generate {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    margin-top: 8px;
+  }
+  .btn-generate:hover { opacity: 0.9; }
+  .btn-generate:active { transform: scale(0.99); }
+  .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Result */
+  .result {
+    margin-top: 20px;
+    padding: 16px;
+    background: #f7fafc;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    display: none;
+  }
+  .result.show { display: block; }
+  .result-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .result-header label { margin: 0; }
+  .btn-download {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 12px;
+    background: linear-gradient(135deg, #38a169, #2f855a);
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    text-align: center;
+  }
+  .btn-download:hover { opacity: 0.88; }
+  audio { width: 100%; margin-top: 4px; }
+
+  /* Status bar */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 20px;
+    font-size: 0.85rem;
+    color: #718096;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #fc8181;
+    flex-shrink: 0;
+  }
+  .status-dot.ready { background: #68d391; }
+  .status-dot.loading {
+    background: #f6ad55;
+    animation: pulse 1s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Save button */
+  .btn-save {
+    padding: 10px 16px;
+    background: #edf2ff;
+    border: 1px solid #c3d0f5;
+    border-radius: 8px;
+    color: #4a5568;
+    font-size: 0.85rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s;
+    height: 40px;
+  }
+  .btn-save:hover { background: #dce4ff; }
+  .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Saved voice chip */
+  .voice-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 20px;
+    background: #f7fafc;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #4a5568;
+    transition: all 0.2s;
+  }
+  .voice-chip:hover { border-color: #667eea; background: #fff; }
+  .voice-chip.selected {
+    border-color: transparent;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(102,126,234,0.4);
+  }
+  .voice-chip.selected .del-btn { color: rgba(255,255,255,0.7); }
+  .voice-chip.selected .del-btn:hover { color: #fff; }
+  .voice-chip .del-btn {
+    color: #a0aec0;
+    font-size: 0.75rem;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+  }
+  .voice-chip .del-btn:hover { color: #e53e3e; }
+  .no-voices { color: #a0aec0; font-size: 0.85rem; padding: 6px 0; }
+
+  /* Success msg */
+  .success-msg {
+    padding: 10px 14px;
+    background: rgba(72,187,120,0.08);
+    border: 1px solid #48bb78;
+    border-radius: 8px;
+    color: #276749;
+    font-size: 0.85rem;
+    margin-top: 12px;
+    display: none;
+  }
+  .success-msg.show { display: block; }
+
+  /* Loading overlay */
+  .loading-msg {
+    text-align: center;
+    padding: 12px;
+    color: #d69e2e;
+    font-size: 0.9rem;
+    display: none;
+  }
+  .loading-msg.show { display: block; }
+
+  /* Error */
+  .error-msg {
+    padding: 10px 14px;
+    background: rgba(245,101,101,0.08);
+    border: 1px solid #f56565;
+    border-radius: 8px;
+    color: #c53030;
+    font-size: 0.85rem;
+    margin-top: 12px;
+    display: none;
+  }
+  .error-msg.show { display: block; }
+
+  /* Clone section blocks */
+  .clone-section {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    background: #f7fafc;
+  }
+  .clone-section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .clone-section-badge {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    color: #fff;
+  }
+  .clone-section-badge.s1 { background: linear-gradient(135deg, #667eea, #764ba2); }
+  .clone-section-badge.s2 { background: linear-gradient(135deg, #38a169, #2f855a); }
+  .clone-section-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1a202c;
+  }
+  .clone-section-desc {
+    font-size: 0.8rem;
+    color: #718096;
+    margin-left: auto;
+  }
+  .btn-record {
+    padding: 10px 20px;
+    border: 2px solid #fc8181;
+    border-radius: 8px;
+    background: #fff5f5;
+    color: #c53030;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .btn-record:hover { background: #fed7d7; }
+  .btn-record.recording {
+    background: #fc8181;
+    color: #fff;
+    border-color: #e53e3e;
+  }
+  .rec-indicator {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #e53e3e;
+    display: inline-block;
+    flex-shrink: 0;
+    animation: pulse 1s infinite;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1 style="background:none;-webkit-text-fill-color:#1a202c;">TTS语音合成</h1>
+    <p>支持语音合成、声音设计与声音克隆</p>
+  </div>
+
+  <!-- Status -->
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">检查服务状态...</span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('clone')">🔁 声音克隆</button>
+    <button class="tab-btn" onclick="switchTab('custom')">🔊 语音合成</button>
+    <button class="tab-btn" onclick="switchTab('design')">🎨 声音设计</button>
+  </div>
+
+  <!-- ===== Panel: Custom Voice ===== -->
+  <div class="panel" id="panel-custom">
+    <div class="panel-title">语音合成</div>
+    <div class="panel-desc">从 9 个内置音色中选择，支持情感/语气指令控制（仅 1.7B 模型）</div>
+
+    <div class="form-group">
+      <label>选择音色</label>
+      <div class="speaker-grid" id="speakerGrid"></div>
+    </div>
+
+    <div class="form-group">
+      <label>合成文本</label>
+      <textarea id="cv-text" placeholder="请输入要合成的文字，中英文均支持...">其实我真的有发现，我是一个特别善于观察别人情绪的人。</textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>语言</label>
+        <select id="cv-lang">
+          <option value="Auto">自动识别</option>
+          <option value="Chinese">中文</option>
+          <option value="English">英文</option>
+          <option value="Japanese">日语</option>
+          <option value="Korean">韩语</option>
+          <option value="German">德语</option>
+          <option value="French">法语</option>
+          <option value="Russian">俄语</option>
+          <option value="Spanish">西班牙语</option>
+          <option value="Portuguese">葡萄牙语</option>
+          <option value="Italian">意大利语</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>情感/语气指令 <span style="color:#718096">（可选）</span></label>
+        <input type="text" id="cv-instruct" placeholder="例：用愤怒的语气说、Very happy">
+      </div>
+    </div>
+
+    <button class="btn-generate" id="cv-btn" onclick="generateCustomVoice()">▶ 生成语音</button>
+    <div class="loading-msg" id="cv-loading">⏳ 正在加载模型并生成，请稍候（首次加载约 20 秒）...</div>
+    <div class="error-msg" id="cv-error"></div>
+    <div class="result" id="cv-result">
+      <label class="panel-title" style="margin-bottom:8px">生成结果</label>
+      <audio id="cv-audio" controls></audio>
+    </div>
+    <a id="cv-download" download="cv_output.wav"
+       style="display:block;width:100%;margin-top:12px;padding:14px;background:#cbd5e0;border-radius:10px;color:#718096;font-size:1rem;font-weight:600;text-decoration:none;text-align:center;cursor:not-allowed;pointer-events:none;">
+      ⬇ 下载生成的语音
+    </a>
+  </div>
+
+  <!-- ===== Panel: Voice Design ===== -->
+  <div class="panel" id="panel-design">
+    <div class="panel-title">声音设计</div>
+    <div class="panel-desc">用自然语言描述目标声音特征，无需参考音频，创造全新音色</div>
+
+    <div class="form-group">
+      <label>合成文本</label>
+      <textarea id="vd-text" placeholder="请输入要合成的文字...">哥哥，你回来啦，人家等了你好久好久了，要抱抱！</textarea>
+    </div>
+
+    <div class="form-group">
+      <label>声音描述指令</label>
+      <textarea id="vd-instruct" placeholder="描述目标声音的音色、情绪、语速、风格等特征..." style="min-height:80px">体现撒娇稚嫩的萝莉女声，音调偏高且起伏明显，营造出黏人、做作又刻意卖萌的听觉效果。</textarea>
+    </div>
+
+    <div class="form-group">
+      <label>语言</label>
+      <select id="vd-lang">
+        <option value="Auto">自动识别</option>
+        <option value="Chinese">中文</option>
+        <option value="English">英文</option>
+        <option value="Japanese">日语</option>
+        <option value="Korean">韩语</option>
+        <option value="German">德语</option>
+        <option value="French">法语</option>
+        <option value="Russian">俄语</option>
+        <option value="Spanish">西班牙语</option>
+        <option value="Portuguese">葡萄牙语</option>
+        <option value="Italian">意大利语</option>
+      </select>
+    </div>
+
+    <button class="btn-generate" id="vd-btn" onclick="generateVoiceDesign()">▶ 生成语音</button>
+    <div class="loading-msg" id="vd-loading">⏳ 正在加载模型并生成，请稍候（首次加载约 20 秒）...</div>
+    <div class="error-msg" id="vd-error"></div>
+    <div class="result" id="vd-result">
+      <label class="panel-title" style="margin-bottom:8px">生成结果</label>
+      <audio id="vd-audio" controls></audio>
+    </div>
+    <a id="vd-download" download="vd_output.wav"
+       style="display:block;width:100%;margin-top:12px;padding:14px;background:#cbd5e0;border-radius:10px;color:#718096;font-size:1rem;font-weight:600;text-decoration:none;text-align:center;cursor:not-allowed;pointer-events:none;">
+      ⬇ 下载生成的语音
+    </a>
+    <button id="vd-use-clone-btn" onclick="useDesignedAudio()"
+       style="display:none;width:100%;margin-top:10px;padding:14px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;border-radius:10px;color:#fff;font-size:1rem;font-weight:600;cursor:pointer;">
+      🔁 用此音频克隆
+    </button>
+  </div>
+
+  <!-- ===== Panel: Voice Clone ===== -->
+  <div class="panel active" id="panel-clone">
+    <div class="panel-title">声音克隆</div>
+    <div class="panel-desc">设置音色来源，然后输入文本生成克隆语音</div>
+
+    <!-- ① 声音来源 -->
+    <div class="clone-section">
+      <div class="clone-section-header">
+        <span class="clone-section-badge s1">1</span>
+        <span class="clone-section-title">音色录制</span>
+        <span class="clone-section-desc">选择已保存音色，或提供参考音频</span>
+      </div>
+
+      <!-- 来自声音设计 -->
+      <div id="designed-audio-bar" style="display:none;align-items:center;gap:10px;padding:12px 16px;background:rgba(102,126,234,0.08);border:1px solid #667eea;border-radius:10px;margin-bottom:16px;">
+        <span style="font-size:1.2rem;">🎨</span>
+        <div style="flex:1;font-size:0.88rem;color:#4a5568;">已加载声音设计音频：<strong id="designed-audio-name" style="color:#5a67d8;"></strong></div>
+        <button onclick="clearDesignedAudio()" style="background:none;border:none;color:#a0aec0;font-size:1rem;cursor:pointer;">✕</button>
+      </div>
+
+      <!-- Saved voices -->
+      <div class="form-group">
+        <label>已保存音色 <span style="color:#718096">（选择后无需上传音频）</span></label>
+        <div id="saved-voice-list" style="display:flex;flex-wrap:wrap;gap:8px;min-height:36px;"></div>
+      </div>
+
+      <!-- Divider + 上传区（加载设计音频时隐藏）-->
+      <div id="clone-upload-section">
+        <div style="display:flex;align-items:center;gap:10px;margin:16px 0;">
+          <div style="flex:1;height:1px;background:#e2e8f0;"></div>
+          <span style="color:#718096;font-size:0.8rem;">或提供参考音频（随便说一句话）</span>
+          <div style="flex:1;height:1px;background:#e2e8f0;"></div>
+        </div>
+
+        <div class="form-group">
+          <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:stretch;">
+
+            <!-- 左：录制 -->
+            <div>
+              <label style="margin-bottom:4px;font-size:0.8rem;">录制音频</label>
+              <div style="border:2px dashed #cbd5e0;border-radius:10px;padding:8px 12px;background:#f7fafc;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:42px;height:calc(100% - 22px);">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;">
+                  <button id="btn-record" class="btn-record" onclick="toggleRecording()" style="padding:6px 14px;font-size:0.82rem;">🎤 开始录制</button>
+                  <span id="record-status" style="display:none;align-items:center;gap:6px;color:#e53e3e;font-size:0.82rem;">
+                    <span class="rec-indicator"></span>
+                    <span id="record-timer">00:00</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 中：分隔 -->
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding-top:22px;">
+              <div style="flex:1;width:1px;background:#e2e8f0;"></div>
+              <span style="color:#a0aec0;font-size:0.75rem;white-space:nowrap;">或</span>
+              <div style="flex:1;width:1px;background:#e2e8f0;"></div>
+            </div>
+
+            <!-- 右：上传 -->
+            <div>
+              <label style="margin-bottom:4px;font-size:0.8rem;">上传音频</label>
+              <div class="file-upload" onclick="document.getElementById('clone-file').click()" style="padding:8px 12px;display:flex;align-items:center;gap:8px;text-align:left;height:calc(100% - 22px);">
+                <input type="file" id="clone-file" accept="audio/*" onchange="onFileSelect(this)">
+                <div style="font-size:1rem;">🎵</div>
+                <div>
+                  <div class="hint" style="font-size:0.78rem;">点击选取（WAV / MP3 等）</div>
+                  <div class="filename" id="clone-filename" style="font-size:0.78rem;"></div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- 录音预览（横跨全宽）-->
+          <div id="record-preview" style="display:none;margin-top:10px;">
+            <audio id="record-audio" controls style="width:100%;margin-top:0;"></audio>
+            <div style="font-size:0.8rem;color:#48bb78;margin-top:4px;">✅ 录音已就绪，将作为参考音频使用</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:0">
+        <label>参考音频对应文本 <span style="color:#fc8181">*</span></label>
+        <input type="text" id="clone-ref-text" placeholder="参考音频对应的文字内容，必须准确...">
+      </div>
+
+      <!-- Save voice -->
+      <div style="display:flex;gap:8px;margin-top:14px;align-items:flex-end;">
+        <div style="width:160px;flex-shrink:0;">
+          <label>保存为音色名称</label>
+          <input type="text" id="clone-save-name" placeholder="音色名称">
+        </div>
+        <button class="btn-save" id="clone-save-btn" onclick="saveVoice()">💾 保存为常用音色</button>
+      </div>
+      <div class="loading-msg" id="save-loading">⏳ 正在提取声音特征并保存...</div>
+      <div class="error-msg" id="save-error"></div>
+      <div class="success-msg" id="save-success"></div>
+    </div>
+
+    <!-- ② 合成生成 -->
+    <div class="clone-section" style="background:#f0fff4;border-color:#c6f6d5;">
+      <div class="clone-section-header">
+        <span class="clone-section-badge s2">2</span>
+        <span class="clone-section-title">语音合成</span>
+        <span class="clone-section-desc">输入要生成的文本内容</span>
+      </div>
+
+      <div class="form-group">
+        <label>合成文本</label>
+        <textarea id="clone-text" placeholder="请输入要用克隆音色合成的文字...">今天天气真不错，阳光明媚，微风轻拂，适合出去走走。</textarea>
+      </div>
+
+      <div class="form-group" style="margin-bottom:0">
+        <label>语言</label>
+        <select id="clone-lang">
+          <option value="Auto">自动识别</option>
+          <option value="Chinese">中文</option>
+          <option value="English">英文</option>
+          <option value="Japanese">日语</option>
+          <option value="Korean">韩语</option>
+          <option value="German">德语</option>
+          <option value="French">法语</option>
+          <option value="Russian">俄语</option>
+          <option value="Spanish">西班牙语</option>
+          <option value="Portuguese">葡萄牙语</option>
+          <option value="Italian">意大利语</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn-generate" id="clone-btn" onclick="generateVoiceClone()">▶ 生成语音</button>
+    <div class="loading-msg" id="clone-loading">⏳ 正在加载模型并生成，请稍候（首次加载约 20 秒）...</div>
+    <div class="error-msg" id="clone-error"></div>
+    <div class="result" id="clone-result">
+      <label class="panel-title" style="margin-bottom:8px">生成结果</label>
+      <audio id="clone-audio" controls></audio>
+    </div>
+    <a id="clone-download" download="clone_output.wav"
+       style="display:block;width:100%;margin-top:12px;padding:14px;background:#cbd5e0;border-radius:10px;color:#718096;font-size:1rem;font-weight:600;text-decoration:none;text-align:center;cursor:not-allowed;pointer-events:none;">
+      ⬇ 下载生成的语音
+    </a>
+  </div>
+
+</div>
+
+<script>
+// ---- 声音设计音频全局存储 ----
+let designedAudioBlob = null;
+let designedAudioText = "";
+
+// ---- 录音全局状态 ----
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordTimerInterval = null;
+let recordSeconds = 0;
+let recordedAudioFile = null;
+let isRecording = false;
+
+async function toggleRecording() {
+  if (isRecording) {
+    stopRecording();
+  } else {
+    await startRecording();
+  }
+}
+
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = onRecordingStop;
+    mediaRecorder.start();
+    isRecording = true;
+
+    const btn = document.getElementById("btn-record");
+    btn.textContent = "⏹ 停止录制";
+    btn.classList.add("recording");
+
+    document.getElementById("record-status").style.display = "flex";
+    document.getElementById("record-preview").style.display = "none";
+
+    recordSeconds = 0;
+    document.getElementById("record-timer").textContent = "00:00";
+    recordTimerInterval = setInterval(() => {
+      recordSeconds++;
+      const m = String(Math.floor(recordSeconds / 60)).padStart(2, "0");
+      const s = String(recordSeconds % 60).padStart(2, "0");
+      document.getElementById("record-timer").textContent = `${m}:${s}`;
+    }, 1000);
+
+    // 清空已选文件
+    document.getElementById("clone-file").value = "";
+    document.getElementById("clone-filename").textContent = "";
+    recordedAudioFile = null;
+  } catch (e) {
+    alert("无法访问麦克风：" + e.message);
+  }
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+    mediaRecorder.stream.getTracks().forEach(t => t.stop());
+  }
+  clearInterval(recordTimerInterval);
+  isRecording = false;
+  const btn = document.getElementById("btn-record");
+  btn.textContent = "🎤 重新录制";
+  btn.classList.remove("recording");
+  document.getElementById("record-status").style.display = "none";
+}
+
+async function onRecordingStop() {
+  const blob = new Blob(recordedChunks, { type: "audio/webm" });
+  recordedAudioFile = new File([blob], "recorded.webm", { type: "audio/webm" });
+
+  const previewDiv = document.getElementById("record-preview");
+  const audioEl = document.getElementById("record-audio");
+  audioEl.src = URL.createObjectURL(blob);
+  previewDiv.style.display = "block";
+
+  // 自动转写
+  const refTextEl = document.getElementById("clone-ref-text");
+  const origPlaceholder = refTextEl.placeholder;
+  refTextEl.placeholder = "⏳ 正在识别音频文字...";
+  refTextEl.disabled = true;
+  try {
+    const fd = new FormData();
+    fd.append("ref_audio", recordedAudioFile);
+    const r = await fetch("/tts/api/transcribe", { method: "POST", body: fd });
+    if (r.ok) {
+      const d = await r.json();
+      refTextEl.value = d.text;
+    }
+  } catch(e) {
+    console.warn("转写失败:", e);
+  } finally {
+    refTextEl.placeholder = origPlaceholder;
+    refTextEl.disabled = false;
+  }
+}
+
+function clearRecording() {
+  recordedAudioFile = null;
+  isRecording = false;
+  clearInterval(recordTimerInterval);
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+    mediaRecorder.stream.getTracks().forEach(t => t.stop());
+  }
+  document.getElementById("record-preview").style.display = "none";
+  document.getElementById("record-status").style.display = "none";
+  const btn = document.getElementById("btn-record");
+  btn.textContent = "🎤 开始录制";
+  btn.classList.remove("recording");
+}
+
+function useDesignedAudio() {
+  if (!designedAudioBlob) return;
+  designedAudioText = document.getElementById("vd-text").value.trim();
+  switchTab("clone");
+  document.getElementById("designed-audio-bar").style.display = "flex";
+  document.getElementById("designed-audio-name").textContent =
+    designedAudioText.slice(0, 20) + (designedAudioText.length > 20 ? "…" : "");
+  document.getElementById("clone-ref-text").value = designedAudioText;
+  // 隐藏文件上传区
+  document.getElementById("clone-upload-section").style.display = "none";
+  // 清空已选文件和已选音色
+  document.getElementById("clone-file").value = "";
+  document.getElementById("clone-filename").textContent = "";
+  clearRecording();
+  selectedSavedVoice = "";
+  document.querySelectorAll(".voice-chip").forEach(c => c.classList.remove("selected"));
+}
+
+function clearDesignedAudio() {
+  designedAudioBlob = null;
+  designedAudioText = "";
+  document.getElementById("designed-audio-bar").style.display = "none";
+  // 恢复文件上传区
+  document.getElementById("clone-upload-section").style.display = "block";
+}
+// ---- Speaker data ----
+const SPEAKERS = [
+  { id: "Vivian",   name: "Vivian",    lang: "中文",   desc: "明亮年轻女声" },
+  { id: "Serena",   name: "Serena",    lang: "中文",   desc: "温暖柔和女声" },
+  { id: "Uncle_Fu", name: "Uncle_Fu",  lang: "中文",   desc: "低沉醇厚男声" },
+  { id: "Dylan",    name: "Dylan",     lang: "北京话", desc: "清晰自然男声" },
+  { id: "Eric",     name: "Eric",      lang: "四川话", desc: "略带沙哑男声" },
+  { id: "Ryan",     name: "Ryan",      lang: "英文",   desc: "活力节奏男声" },
+  { id: "Aiden",    name: "Aiden",     lang: "英文",   desc: "阳光美式男声" },
+  { id: "Ono_Anna", name: "Ono_Anna",  lang: "日语",   desc: "轻盈灵动女声" },
+  { id: "Sohee",    name: "Sohee",     lang: "韩语",   desc: "温暖情感女声" },
+];
+
+let selectedSpeaker = "Vivian";
+
+function initSpeakers() {
+  const grid = document.getElementById("speakerGrid");
+  SPEAKERS.forEach(s => {
+    const card = document.createElement("div");
+    card.className = "speaker-card" + (s.id === selectedSpeaker ? " selected" : "");
+    card.dataset.id = s.id;
+    card.innerHTML = `<div class="name">${s.name}</div><div class="lang">${s.lang}</div><div class="desc">${s.desc}</div>`;
+    card.onclick = () => {
+      document.querySelectorAll(".speaker-card").forEach(c => c.classList.remove("selected"));
+      card.classList.add("selected");
+      selectedSpeaker = s.id;
+    };
+    grid.appendChild(card);
+  });
+}
+
+// ---- Tab switch ----
+function switchTab(name) {
+  document.querySelectorAll(".tab-btn").forEach((b, i) => {
+    b.classList.toggle("active", ["clone","custom","design"][i] === name);
+  });
+  document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+  document.getElementById("panel-" + name).classList.add("active");
+}
+
+// ---- File select ----
+async function onFileSelect(input) {
+  const fn = document.getElementById("clone-filename");
+  const file = input.files[0];
+  fn.textContent = file ? "已选择：" + file.name : "";
+  if (!file) return;
+
+  const refTextEl = document.getElementById("clone-ref-text");
+  const origPlaceholder = refTextEl.placeholder;
+  refTextEl.placeholder = "⏳ 正在识别音频文字...";
+  refTextEl.disabled = true;
+
+  try {
+    const fd = new FormData();
+    fd.append("ref_audio", file);
+    const r = await fetch("/tts/api/transcribe", { method: "POST", body: fd });
+    if (r.ok) {
+      const d = await r.json();
+      refTextEl.value = d.text;
+    }
+  } catch(e) {
+    console.warn("转写失败:", e);
+  } finally {
+    refTextEl.placeholder = origPlaceholder;
+    refTextEl.disabled = false;
+  }
+}
+
+// ---- Status ----
+async function updateStatus() {
+  try {
+    const r = await fetch("/tts/api/status");
+    const d = await r.json();
+    const dot = document.getElementById("statusDot");
+    const txt = document.getElementById("statusText");
+    dot.className = "status-dot ready";
+    txt.textContent = d.loaded_model
+      ? `已加载：${d.loaded_model}  |  GPU 剩余：${d.gpu_free_mb} MB`
+      : `服务就绪，GPU 剩余：${d.gpu_free_mb} MB`;
+  } catch {
+    document.getElementById("statusDot").className = "status-dot";
+    document.getElementById("statusText").textContent = "服务连接失败";
+  }
+}
+
+// ---- Generate helpers ----
+function setLoading(prefix, on) {
+  document.getElementById(prefix + "-btn").disabled = on;
+  document.getElementById(prefix + "-loading").classList.toggle("show", on);
+  document.getElementById(prefix + "-error").classList.remove("show");
+  document.getElementById(prefix + "-result").classList.remove("show");
+}
+
+function showError(prefix, msg) {
+  const el = document.getElementById(prefix + "-error");
+  el.textContent = "错误：" + msg;
+  el.classList.add("show");
+}
+
+function showAudio(prefix, blob) {
+  const url = URL.createObjectURL(blob);
+  const audio = document.getElementById(prefix + "-audio");
+  audio.src = url;
+
+  const dl = document.getElementById(prefix + "-download");
+  if (dl) {
+    dl.href = url;
+    dl.download = prefix + "_output.wav";
+    dl.textContent = "⬇ 下载生成的语音";
+    dl.style.cssText = "display:block;width:100%;margin-top:12px;padding:14px;background:linear-gradient(135deg,#38a169,#2f855a);border-radius:10px;color:#fff;font-size:1rem;font-weight:600;text-decoration:none;text-align:center;cursor:pointer;pointer-events:auto;";
+  }
+
+  // 声音设计：保存 blob 并显示「用此音频克隆」按钮
+  if (prefix === "vd") {
+    designedAudioBlob = blob;
+    const cloneBtn = document.getElementById("vd-use-clone-btn");
+    if (cloneBtn) cloneBtn.style.display = "block";
+  }
+  document.getElementById(prefix + "-result").classList.add("show");
+  audio.play();
+  updateStatus();
+}
+
+// ---- Custom Voice ----
+async function generateCustomVoice() {
+  const text = document.getElementById("cv-text").value.trim();
+  if (!text) return alert("请输入合成文本");
+  setLoading("cv", true);
+  try {
+    const fd = new FormData();
+    fd.append("text", text);
+    fd.append("speaker", selectedSpeaker);
+    fd.append("language", document.getElementById("cv-lang").value);
+    fd.append("instruct", document.getElementById("cv-instruct").value);
+    const r = await fetch("/tts/api/custom_voice", { method: "POST", body: fd });
+    if (!r.ok) { showError("cv", (await r.json()).detail); return; }
+    showAudio("cv", await r.blob());
+  } catch(e) { showError("cv", e.message); }
+  finally { setLoading("cv", false); }
+}
+
+// ---- Voice Design ----
+async function generateVoiceDesign() {
+  const text = document.getElementById("vd-text").value.trim();
+  const instruct = document.getElementById("vd-instruct").value.trim();
+  if (!text) return alert("请输入合成文本");
+  if (!instruct) return alert("请输入声音描述指令");
+  setLoading("vd", true);
+  try {
+    const fd = new FormData();
+    fd.append("text", text);
+    fd.append("instruct", instruct);
+    fd.append("language", document.getElementById("vd-lang").value);
+    const r = await fetch("/tts/api/voice_design", { method: "POST", body: fd });
+    if (!r.ok) { showError("vd", (await r.json()).detail); return; }
+    showAudio("vd", await r.blob());
+  } catch(e) { showError("vd", e.message); }
+  finally { setLoading("vd", false); }
+}
+
+// ---- Saved voices ----
+let selectedSavedVoice = "";
+
+async function loadSavedVoices() {
+  try {
+    const r = await fetch("/tts/api/saved_voices");
+    const d = await r.json();
+    renderSavedVoices(d.voices);
+  } catch {}
+}
+
+function renderSavedVoices(voices) {
+  const container = document.getElementById("saved-voice-list");
+  container.innerHTML = "";
+  if (voices.length === 0) {
+    container.innerHTML = '<span class="no-voices">暂无保存的音色，上传参考音频后点击"保存音色"</span>';
+    return;
+  }
+  voices.forEach(name => {
+    const chip = document.createElement("div");
+    chip.className = "voice-chip" + (name === selectedSavedVoice ? " selected" : "");
+    chip.innerHTML = `<span onclick="selectSavedVoice('${name}')">${name}</span><span class="del-btn" onclick="deleteVoice('${name}')">✕</span>`;
+    container.appendChild(chip);
+  });
+}
+
+function selectSavedVoice(name) {
+  selectedSavedVoice = (selectedSavedVoice === name) ? "" : name;
+  document.querySelectorAll(".voice-chip").forEach(c => {
+    c.classList.toggle("selected", c.querySelector("span").textContent === selectedSavedVoice);
+  });
+  // Clear file input if saved voice selected
+  if (selectedSavedVoice) {
+    document.getElementById("clone-file").value = "";
+    document.getElementById("clone-filename").textContent = "";
+    clearRecording();
+  }
+}
+
+async function deleteVoice(name) {
+  if (!confirm(`确认删除音色"${name}"？`)) return;
+  const r = await fetch(`/tts/api/saved_voices/${encodeURIComponent(name)}`, { method: "DELETE" });
+  if (r.ok) {
+    if (selectedSavedVoice === name) selectedSavedVoice = "";
+    loadSavedVoices();
+  }
+}
+
+async function saveVoice() {
+  const name = document.getElementById("clone-save-name").value.trim();
+  const refText = document.getElementById("clone-ref-text").value.trim();
+  const fileInput = document.getElementById("clone-file");
+  const refAudio = fileInput.files[0] || recordedAudioFile;
+  if (!name) return alert("请输入音色名称");
+  if (!refText) return alert("请填写参考文本");
+  if (!refAudio) return alert("请上传或录制参考音频");
+
+  document.getElementById("clone-save-btn").disabled = true;
+  document.getElementById("save-loading").classList.add("show");
+  document.getElementById("save-error").classList.remove("show");
+  document.getElementById("save-success").classList.remove("show");
+
+  try {
+    const fd = new FormData();
+    fd.append("name", name);
+    fd.append("ref_text", refText);
+    fd.append("ref_audio", refAudio);
+    const r = await fetch("/tts/api/save_voice", { method: "POST", body: fd });
+    if (!r.ok) {
+      const d = await r.json();
+      document.getElementById("save-error").textContent = "保存失败：" + d.detail;
+      document.getElementById("save-error").classList.add("show");
+      return;
+    }
+    const d = await r.json();
+    document.getElementById("save-success").textContent = `✅ 音色"${d.name}"保存成功，下次可直接选用`;
+    document.getElementById("save-success").classList.add("show");
+    document.getElementById("clone-save-name").value = randomFlowerName();
+    loadSavedVoices();
+  } catch(e) {
+    document.getElementById("save-error").textContent = "保存失败：" + e.message;
+    document.getElementById("save-error").classList.add("show");
+  } finally {
+    document.getElementById("clone-save-btn").disabled = false;
+    document.getElementById("save-loading").classList.remove("show");
+  }
+}
+
+async function generateVoiceClone() {
+  const text = document.getElementById("clone-text").value.trim();
+  if (!text) return alert("请输入合成文本");
+
+  const useSaved = !!selectedSavedVoice;
+  const barVisible = document.getElementById("designed-audio-bar").style.display === "flex";
+  const vdAudioSrc = document.getElementById("vd-audio").src;
+  const useDesigned = !useSaved && barVisible && !!vdAudioSrc;
+  const fileInput = document.getElementById("clone-file");
+  const refAudio = fileInput.files[0] || recordedAudioFile;
+  const refText = document.getElementById("clone-ref-text").value.trim();
+
+  if (!useSaved && !useDesigned) {
+    if (!refAudio) return alert("请上传参考音频、录制音频，或选择已保存音色");
+    if (!refText) return alert("请填写参考文本");
+  }
+  if (useDesigned && !refText) return alert("请填写参考文本");
+
+  setLoading("clone", true);
+  try {
+    const fd = new FormData();
+    fd.append("text", text);
+    fd.append("language", document.getElementById("clone-lang").value);
+    fd.append("saved_voice", selectedSavedVoice);
+    if (!useSaved) {
+      fd.append("ref_text", refText);
+      if (useDesigned) {
+        // 从声音设计的音频元素直接取 blob
+        const audioBlob = await fetch(vdAudioSrc).then(r => r.blob());
+        fd.append("ref_audio", new File([audioBlob], "designed.wav", { type: "audio/wav" }));
+      } else {
+        fd.append("ref_audio", refAudio);
+      }
+    }
+    const r = await fetch("/tts/api/voice_clone", { method: "POST", body: fd });
+    if (!r.ok) { showError("clone", (await r.json()).detail); return; }
+    showAudio("clone", await r.blob());
+  } catch(e) { showError("clone", e.message); }
+  finally { setLoading("clone", false); }
+}
+
+// ---- Init ----
+const FLOWER_NAMES = [
+  "玫瑰","茉莉","牡丹","荷花","梅花","兰花","菊花","桂花","樱花","紫藤",
+  "芍药","杜鹃","紫罗兰","水仙","百合","向日葵","薰衣草","丁香","木槿","凌霄",
+  "栀子","海棠","杏花","桃花","梨花","蔷薇","玉兰","紫薇","芙蓉","雏菊"
+];
+function randomFlowerName() {
+  return FLOWER_NAMES[Math.floor(Math.random() * FLOWER_NAMES.length)];
+}
+document.getElementById("clone-save-name").value = randomFlowerName();
+
+initSpeakers();
+updateStatus();
+loadSavedVoices();
+setInterval(updateStatus, 10000);
+</script>
+</body>
+</html>

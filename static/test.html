@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TTS 自动化测试报告</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+    background: #f0f2f5;
+    color: #1a202c;
+    padding: 24px 16px;
+  }
+  .container { max-width: 960px; margin: 0 auto; }
+  h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 4px;
+  }
+  .subtitle { color: #718096; font-size: 0.9rem; margin-bottom: 24px; }
+
+  /* Summary */
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .summary-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
+  .summary-card .num { font-size: 2rem; font-weight: 700; line-height: 1; }
+  .summary-card .lbl { font-size: 0.8rem; color: #718096; margin-top: 4px; }
+  .summary-card.total .num { color: #4a5568; }
+  .summary-card.pass .num { color: #38a169; }
+  .summary-card.fail .num { color: #e53e3e; }
+  .summary-card.skip .num { color: #dd6b20; }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .btn {
+    padding: 10px 22px;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+  .btn-secondary { background: #edf2ff; color: #4a5568; border: 1px solid #c3d0f5; }
+  .btn-export { background: #e6fffa; color: #276749; border: 1px solid #81e6d9; }
+  .progress-bar {
+    flex: 1;
+    min-width: 160px;
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    width: 0%;
+    transition: width 0.3s;
+    border-radius: 4px;
+  }
+  .progress-text { font-size: 0.8rem; color: #718096; white-space: nowrap; }
+
+  /* Test group */
+  .group {
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 16px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
+  .group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    background: #f7fafc;
+    border-bottom: 1px solid #e2e8f0;
+    cursor: pointer;
+    user-select: none;
+  }
+  .group-header:hover { background: #edf2ff; }
+  .group-title { font-weight: 600; font-size: 0.95rem; flex: 1; }
+  .group-badge {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+  .badge-pass { background: #c6f6d5; color: #276749; }
+  .badge-fail { background: #fed7d7; color: #9b2c2c; }
+  .badge-pending { background: #e2e8f0; color: #718096; }
+  .badge-running { background: #fefcbf; color: #744210; }
+  .group-toggle { color: #718096; font-size: 0.8rem; transition: transform 0.2s; }
+  .group-toggle.open { transform: rotate(180deg); }
+
+  /* Test rows */
+  .test-list { padding: 0; }
+  .test-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 18px;
+    border-bottom: 1px solid #f0f4f8;
+    font-size: 0.88rem;
+  }
+  .test-row:last-child { border-bottom: none; }
+  .test-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+  .test-info { flex: 1; min-width: 0; }
+  .test-name { font-weight: 500; color: #2d3748; margin-bottom: 3px; }
+  .test-desc { color: #718096; font-size: 0.8rem; margin-bottom: 4px; }
+  .test-detail {
+    font-size: 0.8rem;
+    padding: 6px 10px;
+    background: #f7fafc;
+    border-radius: 6px;
+    border-left: 3px solid #e2e8f0;
+    margin-top: 6px;
+    word-break: break-all;
+  }
+  .test-detail.ok { border-left-color: #68d391; }
+  .test-detail.err { border-left-color: #f56565; color: #c53030; }
+  .test-time {
+    font-size: 0.78rem;
+    color: #a0aec0;
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+  .test-audio { margin-top: 8px; }
+  .test-audio audio { height: 32px; width: 100%; max-width: 320px; }
+
+  /* Status icons */
+  .icon-pass::before { content: "✅"; }
+  .icon-fail::before { content: "❌"; }
+  .icon-skip::before { content: "⏭️"; }
+  .icon-pending::before { content: "⭕"; }
+  .icon-running::before { content: "⏳"; }
+
+  /* Log */
+  .log-section {
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
+  .log-header {
+    padding: 12px 18px;
+    background: #f7fafc;
+    border-bottom: 1px solid #e2e8f0;
+    font-weight: 600;
+    font-size: 0.9rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .log-body {
+    padding: 14px 18px;
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.78rem;
+    color: #4a5568;
+    max-height: 240px;
+    overflow-y: auto;
+    line-height: 1.7;
+  }
+  .log-ok { color: #38a169; }
+  .log-err { color: #e53e3e; }
+  .log-info { color: #3182ce; }
+  .log-warn { color: #dd6b20; }
+
+  @media (max-width: 600px) {
+    .summary { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>TTS 自动化测试报告</h1>
+  <div class="subtitle" id="reportMeta">点击"运行全部测试"开始</div>
+
+  <!-- Summary -->
+  <div class="summary">
+    <div class="summary-card total"><div class="num" id="s-total">0</div><div class="lbl">总用例</div></div>
+    <div class="summary-card pass"><div class="num" id="s-pass">0</div><div class="lbl">通过</div></div>
+    <div class="summary-card fail"><div class="num" id="s-fail">0</div><div class="lbl">失败</div></div>
+    <div class="summary-card skip"><div class="num" id="s-skip">0</div><div class="lbl">跳过</div></div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn btn-primary" id="runBtn" onclick="runAll()">▶ 运行全部测试</button>
+    <button class="btn btn-secondary" onclick="resetAll()">↺ 重置</button>
+    <button class="btn btn-export" onclick="exportReport()">⬇ 导出报告</button>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <span class="progress-text" id="progressText">0 / 0</span>
+  </div>
+
+  <!-- Test Groups -->
+  <div id="testGroups"></div>
+
+  <!-- Log -->
+  <div class="log-section" style="margin-top:16px;">
+    <div class="log-header">
+      执行日志
+      <button class="btn btn-secondary" style="padding:4px 12px;font-size:0.8rem;" onclick="clearLog()">清空</button>
+    </div>
+    <div class="log-body" id="logBody"></div>
+  </div>
+</div>
+
+<script>
+const BASE = "/tts";
+
+const TEST_GROUPS = [
+  {
+    id: "status",
+    title: "① 服务状态检查",
+    tests: [
+      {
+        id: "status_ok",
+        name: "GET /api/status — 服务可用",
+        desc: "检查服务是否在线，返回模型状态和 GPU 信息",
+        run: async () => {
+          const r = await fetchT(`${BASE}/api/status`, {}, 5000);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const d = await r.json();
+          if (d.gpu_free_mb === undefined) throw new Error("缺少 gpu_free_mb 字段");
+          return `服务就绪 | 已加载模型: ${d.loaded_model || "无"} | GPU 剩余: ${d.gpu_free_mb} MB`;
+        }
+      },
+      {
+        id: "speakers_ok",
+        name: "GET /api/speakers — 音色列表",
+        desc: "验证返回 9 个预置音色",
+        run: async () => {
+          const r = await fetchT(`${BASE}/api/speakers`, {}, 5000);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const d = await r.json();
+          if (!Array.isArray(d.speakers)) throw new Error("返回格式错误");
+          if (d.speakers.length !== 9) throw new Error(`期望 9 个音色，实际 ${d.speakers.length} 个`);
+          return `返回 ${d.speakers.length} 个音色: ${d.speakers.join(", ")}`;
+        }
+      },
+      {
+        id: "saved_voices_ok",
+        name: "GET /api/saved_voices — 已保存音色列表",
+        desc: "验证接口可访问，返回格式正确",
+        run: async () => {
+          const r = await fetchT(`${BASE}/api/saved_voices`, {}, 5000);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const d = await r.json();
+          if (!Array.isArray(d.voices)) throw new Error("返回格式错误");
+          return `已保存音色: ${d.voices.length} 个${d.voices.length ? " — " + d.voices.join(", ") : ""}`;
+        }
+      }
+    ]
+  },
+  {
+    id: "custom_voice",
+    title: "② 语音合成 TTS（Custom Voice）",
+    tests: [
+      {
+        id: "cv_vivian_zh",
+        name: "Vivian — 中文合成",
+        desc: "测试中文女声合成，语言：自动识别",
+        audio: true,
+        run: async () => {
+          const fd = new FormData();
+          fd.append("text", "其实我真的有发现，我是一个特别善于观察别人情绪的人。");
+          fd.append("speaker", "Vivian");
+          fd.append("language", "Auto");
+          fd.append("instruct", "");
+          return await callTTS(`${BASE}/api/custom_voice`, fd);
+        }
+      },
+      {
+        id: "cv_ryan_en",
+        name: "Ryan — 英文合成",
+        desc: "测试英文男声合成",
+        audio: true,
+        run: async () => {
+          const fd = new FormData();
+          fd.append("text", "Hello, this is a voice synthesis test. The quick brown fox jumps over the lazy dog.");
+          fd.append("speaker", "Ryan");
+          fd.append("language", "English");
+          fd.append("instruct", "");
+          return await callTTS(`${BASE}/api/custom_voice`, fd);
+        }
+      },
+      {
+        id: "cv_ono_ja",
+        name: "Ono_Anna — 日语合成",
+        desc: "测试日语女声合成",
+        audio: true,
+        run: async () => {
+          const fd = new FormData();
+          fd.append("text", "こんにちは、音声合成のテストです。よろしくお願いします。");
+          fd.append("speaker", "Ono_Anna");
+          fd.append("language", "Japanese");
+          fd.append("instruct", "");
+          return await callTTS(`${BASE}/api/custom_voice`, fd);
+        }
+      },
+      {
+        id: "cv_sohee_ko",
+        name: "Sohee — 韩语合成",
+        desc: "测试韩语女声合成",
+        audio: true,
+        run: async () => {
+          const fd = new FormData();
+          fd.append("text", "안녕하세요, 음성 합성 테스트입니다.");
+          fd.append("speaker", "Sohee");
+          fd.append("language", "Korean");
+          fd.append("instruct", "");
+          return await callTTS(`${BASE}/api/custom_voice`, fd);
+        }
+      },
+      {
+        id: "cv_instruct",
+        name: "Vivian — 情感指令控制",
+        desc: "测试情感/语气指令：用开心激动的语气说",
+        audio: true,
+        run: async () => {
+          const fd = new FormData();
+          fd.append("text", "我今天太开心了，终于完成了这个项目！");
+          fd.append("speaker", "Vivian");
+          fd.append("language", "Chinese");
+          fd.append("instruct", "用开心激动的语气说");
+          return await callTTS(`${BASE}/api/custom_voice`, fd);
+        }
+      },
+      {
+        id: "cv_long_text",
+        name: "Uncle_Fu — 长文本合成",
+        desc: "测试较长文本的合成稳定性",
+        audio: true,
+        run: async () => {
+          const fd = new FormData();
+          fd.append("text", "人工智能技术的发展，正在深刻改变着人类社会的方方面面。从医疗健康到教育科研，从工业制造到日常生活，智能化的浪潮席卷全球。语音合成技术作为人工智能的重要分支，使机器能够以自然流畅的方式与人类进行语音交互，为无数应用场景带来了全新的可能性。");
+          fd.append("speaker", "Uncle_Fu");
+          fd.append("language", "Chinese");
+          fd.append("instruct", "");
+          return await callTTS(`${BASE}/api/custom_voice`, fd);
+        }
+      },
+      {
+        id: "cv_missing_text",
+        name: "错误处理 — 缺少 text 参数",
+        desc: "期望返回 422 错误",
+        run: async () => {
+          const fd = new FormData();
+          fd.append("speaker", "Vivian");
+          const r = await fetchT(`${BASE}/api/custom_voice`, { method: "POST", body: fd }, 10000);
+          if (r.status === 422) return "正确返回 422 Unprocessable Entity";
+          throw new Error(`期望 422，实际 ${r.status}`);
+        }
+      }
+    ]
+  },
+  {
+    id: "voice_design",
+    title: "③ 声音设计（Voice Design）",
+    tests: [
+      {
+        id: "vd_loli",
+        name: "萝莉女声设计",
+        desc: "用自然语言描述音色特征生成语音",
+        audio: true,
+        run: async () => {
+          const fd = new FormData();
+          fd.append("text", "哥哥，你回来啦，人家等了你好久好久了，要抱抱！");
+          fd.append("instruct", "体现撒娇稚嫩的萝莉女声，音调偏高且起伏明显，营造出黏人、做作又刻意卖萌的听觉效果。");
+          fd.append("language", "Auto");
+          return await callTTS(`${BASE}/api/voice_design`, fd);
+        }
+      },
+      {
+        id: "vd_news",
+        name: "新闻播报风格",
+        desc: "测试正式播报音色设计",
+        audio: true,
+        run: async () => {
+          const fd = new FormData();
+          fd.append("text", "据新华社报道，本次科技大会吸引了来自全球五十余个国家和地区的代表参会。");
+          fd.append("instruct", "标准普通话新闻播报风格，语速适中，吐字清晰，声音沉稳有力。");
+          fd.append("language", "Chinese");
+          return await callTTS(`${BASE}/api/voice_design`, fd);
+        }
+      },
+      {
+        id: "vd_missing_instruct",
+        name: "错误处理 — 缺少 instruct 参数",
+        desc: "期望返回 422 错误",
+        run: async () => {
+          const fd = new FormData();
+          fd.append("text", "测试文本");
+          const r = await fetchT(`${BASE}/api/voice_design`, { method: "POST", body: fd }, 10000);
+          if (r.status === 422) return "正确返回 422 Unprocessable Entity";
+          throw new Error(`期望 422，实际 ${r.status}`);
+        }
+      }
+    ]
+  },
+  {
+    id: "voice_clone",
+    title: "④ 声音克隆（Voice Clone）",
+    tests: [
+      {
+        id: "vc_no_audio_no_saved",
+        name: "错误处理 — 无音频且无已保存音色",
+        desc: "期望返回 400 错误",
+        run: async () => {
+          const fd = new FormData();
+          fd.append("text", "测试克隆");
+          fd.append("language", "Auto");
+          fd.append("saved_voice", "");
+          fd.append("ref_text", "");
+          const r = await fetchT(`${BASE}/api/voice_clone`, { method: "POST", body: fd }, 10000);
+          if (r.status === 400) return "正确返回 400 Bad Request";
+          throw new Error(`期望 400，实际 ${r.status}`);
+        }
+      },
+      {
+        id: "vc_no_ref_text",
+        name: "错误处理 — 有音频但缺少参考文本",
+        desc: "期望返回 400 错误",
+        run: async () => {
+          const wavBlob = makeSilentWav(1.0);
+          const fd = new FormData();
+          fd.append("text", "测试克隆");
+          fd.append("language", "Auto");
+          fd.append("saved_voice", "");
+          fd.append("ref_text", "");
+          fd.append("ref_audio", wavBlob, "test.wav");
+          const r = await fetchT(`${BASE}/api/voice_clone`, { method: "POST", body: fd }, 10000);
+          if (r.status === 400) return "正确返回 400 Bad Request";
+          throw new Error(`期望 400，实际 ${r.status}`);
+        }
+      },
+      {
+        id: "vc_saved_not_found",
+        name: "错误处理 — 使用不存在的已保存音色",
+        desc: "期望返回 500 错误",
+        run: async () => {
+          const fd = new FormData();
+          fd.append("text", "测试克隆");
+          fd.append("language", "Auto");
+          fd.append("saved_voice", "__nonexistent_voice_xyz__");
+          const r = await fetchT(`${BASE}/api/voice_clone`, { method: "POST", body: fd }, 10000);
+          if (r.status === 500) return "正确返回 500 — 音色不存在";
+          throw new Error(`期望 500，实际 ${r.status}`);
+        }
+      }
+    ]
+  }
+];
+
+// ─── Helpers ───────────────────────────────
+async function fetchT(url, opts = {}, timeout = 120000) {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), timeout);
+  try { return await fetch(url, { ...opts, signal: ctrl.signal }); }
+  finally { clearTimeout(id); }
+}
+
+async function callTTS(url, fd) {
+  const r = await fetchT(url, { method: "POST", body: fd }, 120000);
+  if (!r.ok) {
+    let msg = `HTTP ${r.status}`;
+    try { const d = await r.json(); msg += ` — ${d.detail}`; } catch {}
+    throw new Error(msg);
+  }
+  const blob = await r.blob();
+  if (blob.size < 1000) throw new Error(`音频文件过小 (${blob.size} bytes)`);
+  return { blob, info: `音频大小: ${(blob.size / 1024).toFixed(1)} KB` };
+}
+
+function makeSilentWav(sec) {
+  const sr = 16000, n = Math.floor(sr * sec);
+  const buf = new ArrayBuffer(44 + n * 2);
+  const v = new DataView(buf);
+  const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  ws(0, "RIFF"); v.setUint32(4, 36 + n * 2, true);
+  ws(8, "WAVE"); ws(12, "fmt ");
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  ws(36, "data"); v.setUint32(40, n * 2, true);
+  return new Blob([buf], { type: "audio/wav" });
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// ─── State ─────────────────────────────────
+let results = {};
+let running = false;
+
+// ─── Render ────────────────────────────────
+function renderGroups() {
+  const container = document.getElementById("testGroups");
+  container.innerHTML = "";
+  TEST_GROUPS.forEach(g => {
+    const div = document.createElement("div");
+    div.className = "group";
+    div.id = "group-" + g.id;
+    const gr = getGroupResult(g.tests.map(t => t.id));
+    div.innerHTML = `
+      <div class="group-header" onclick="toggleGroup('${g.id}')">
+        <span class="group-title">${esc(g.title)}</span>
+        <span class="group-badge ${gr.cls}" id="gbadge-${g.id}">${gr.label}</span>
+        <span class="group-toggle open" id="gtoggle-${g.id}">▼</span>
+      </div>
+      <div class="test-list" id="glist-${g.id}">
+        ${g.tests.map(t => renderRow(t)).join("")}
+      </div>`;
+    container.appendChild(div);
+  });
+}
+
+function renderRow(test) {
+  const r = results[test.id];
+  let icon = "icon-pending", detail = "", timeStr = "", audioHtml = "";
+  if (r) {
+    icon = { pass: "icon-pass", fail: "icon-fail", skip: "icon-skip", running: "icon-running" }[r.status] || "icon-pending";
+    if (r.detail) {
+      const cls = r.status === "pass" ? "ok" : (r.status === "fail" ? "err" : "");
+      detail = `<div class="test-detail ${cls}">${esc(r.detail)}</div>`;
+    }
+    if (r.time != null) timeStr = `${r.time} ms`;
+    if (r.blob) {
+      const url = URL.createObjectURL(r.blob);
+      audioHtml = `<div class="test-audio"><audio controls src="${url}"></audio></div>`;
+    }
+  }
+  return `
+    <div class="test-row" id="row-${test.id}">
+      <span class="test-icon ${icon}"></span>
+      <div class="test-info">
+        <div class="test-name">${esc(test.name)}</div>
+        <div class="test-desc">${esc(test.desc)}</div>
+        ${detail}${audioHtml}
+      </div>
+      <span class="test-time">${timeStr}</span>
+    </div>`;
+}
+
+function updateRow(test) {
+  const el = document.getElementById("row-" + test.id);
+  if (el) el.outerHTML = renderRow(test);
+}
+
+function updateGroupBadge(group) {
+  const gr = getGroupResult(group.tests.map(t => t.id));
+  const el = document.getElementById("gbadge-" + group.id);
+  if (el) { el.className = "group-badge " + gr.cls; el.textContent = gr.label; }
+}
+
+function getGroupResult(ids) {
+  const rs = ids.map(id => results[id]);
+  if (rs.every(r => !r)) return { cls: "badge-pending", label: "待运行" };
+  if (rs.some(r => r && r.status === "running")) return { cls: "badge-running", label: "运行中" };
+  const pass = rs.filter(r => r && r.status === "pass").length;
+  const fail = rs.filter(r => r && r.status === "fail").length;
+  if (fail > 0) return { cls: "badge-fail", label: `${pass}/${ids.length} 通过` };
+  if (pass === ids.length) return { cls: "badge-pass", label: "全部通过 ✓" };
+  return { cls: "badge-pending", label: `${pass}/${ids.length}` };
+}
+
+function toggleGroup(id) {
+  const list = document.getElementById("glist-" + id);
+  const tog = document.getElementById("gtoggle-" + id);
+  const hidden = list.style.display === "none";
+  list.style.display = hidden ? "" : "none";
+  tog.classList.toggle("open", hidden);
+}
+
+function updateSummary() {
+  let total = 0, pass = 0, fail = 0, skip = 0;
+  TEST_GROUPS.forEach(g => g.tests.forEach(t => {
+    total++;
+    const r = results[t.id];
+    if (r) {
+      if (r.status === "pass") pass++;
+      else if (r.status === "fail") fail++;
+      else if (r.status === "skip") skip++;
+    }
+  }));
+  document.getElementById("s-total").textContent = total;
+  document.getElementById("s-pass").textContent = pass;
+  document.getElementById("s-fail").textContent = fail;
+  document.getElementById("s-skip").textContent = skip;
+  const done = pass + fail + skip;
+  document.getElementById("progressFill").style.width = total ? (done / total * 100) + "%" : "0%";
+  document.getElementById("progressText").textContent = `${done} / ${total}`;
+}
+
+// ─── Run ───────────────────────────────────
+async function runAll() {
+  if (running) return;
+  running = true;
+  document.getElementById("runBtn").disabled = true;
+  results = {};
+  renderGroups();
+  updateSummary();
+
+  const t0 = new Date();
+  log("info", `===== 测试开始 ${t0.toLocaleString()} =====`);
+
+  for (const group of TEST_GROUPS) {
+    for (const test of group.tests) {
+      results[test.id] = { status: "running", detail: "运行中...", time: null, blob: null };
+      updateRow(test);
+      updateGroupBadge(group);
+      updateSummary();
+
+      const ts = performance.now();
+      try {
+        log("info", `运行: ${test.name}`);
+        const res = await test.run();
+        const ms = Math.round(performance.now() - ts);
+        const detail = res && res.blob ? res.info : (res || "通过");
+        const blob = res && res.blob ? res.blob : null;
+        results[test.id] = { status: "pass", detail, time: ms, blob };
+        log("ok", `  ✓ ${ms} ms — ${detail}`);
+      } catch (e) {
+        const ms = Math.round(performance.now() - ts);
+        const msg = e.name === "AbortError" ? "请求超时" : e.message;
+        results[test.id] = { status: "fail", detail: msg, time: ms, blob: null };
+        log("err", `  ✗ ${ms} ms — ${msg}`);
+      }
+      updateRow(test);
+      updateGroupBadge(group);
+      updateSummary();
+    }
+  }
+
+  const t1 = new Date();
+  const pass = Object.values(results).filter(r => r.status === "pass").length;
+  const fail = Object.values(results).filter(r => r.status === "fail").length;
+  const total = Object.keys(results).length;
+  log("info", `===== 测试结束 ${t1.toLocaleString()} | 耗时 ${((t1-t0)/1000).toFixed(1)}s =====`);
+  log(fail > 0 ? "warn" : "ok", `结果: ${pass} 通过 / ${fail} 失败 / ${total} 总计`);
+
+  document.getElementById("reportMeta").textContent =
+    `测试时间: ${t0.toLocaleString()} | 耗时: ${((t1-t0)/1000).toFixed(1)}s | 通过: ${pass}/${total}`;
+
+  running = false;
+  document.getElementById("runBtn").disabled = false;
+}
+
+function resetAll() {
+  if (running) return;
+  results = {};
+  renderGroups();
+  updateSummary();
+  document.getElementById("reportMeta").textContent = "点击"运行全部测试"开始";
+  document.getElementById("progressFill").style.width = "0%";
+  document.getElementById("progressText").textContent = "0 / 0";
+  log("info", "已重置");
+}
+
+// ─── Log ───────────────────────────────────
+function log(type, msg) {
+  const body = document.getElementById("logBody");
+  const cls = { ok: "log-ok", err: "log-err", info: "log-info", warn: "log-warn" }[type] || "";
+  body.innerHTML += `<div class="${cls}">[${new Date().toLocaleTimeString()}] ${esc(msg)}</div>`;
+  body.scrollTop = body.scrollHeight;
+}
+function clearLog() { document.getElementById("logBody").innerHTML = ""; }
+
+// ─── Export ────────────────────────────────
+function exportReport() {
+  const lines = ["TTS 自动化测试报告", "=".repeat(50), `生成时间: ${new Date().toLocaleString()}`, ""];
+  TEST_GROUPS.forEach(g => {
+    lines.push(g.title);
+    g.tests.forEach(t => {
+      const r = results[t.id];
+      const status = r ? r.status.toUpperCase() : "PENDING";
+      const time = r && r.time != null ? `${r.time}ms` : "-";
+      lines.push(`  [${status}] ${t.name} (${time})`);
+      if (r && r.detail) lines.push(`         ${r.detail}`);
+    });
+    lines.push("");
+  });
+  const pass = Object.values(results).filter(r => r.status === "pass").length;
+  const fail = Object.values(results).filter(r => r.status === "fail").length;
+  lines.push("=".repeat(50));
+  lines.push(`总计: ${pass} 通过 / ${fail} 失败`);
+
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" }));
+  a.download = `tts_test_report_${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+}
+
+// ─── Init ──────────────────────────────────
+renderGroups();
+updateSummary();
+</script>
+</body>
+</html>
